@@ -1,0 +1,82 @@
+# =============================================================================
+# 매도 신호 알림 - GitHub Actions 워크플로우
+# =============================================================================
+# 미국장 시간에 5분마다 매도 신호를 체크하고 텔레그램으로 알림을 보냅니다.
+# 
+# 설정 방법:
+# 1. GitHub 레포지토리 Settings → Secrets and variables → Actions
+# 2. 다음 Secrets 추가:
+#    - TELEGRAM_BOT_TOKEN: 텔레그램 봇 토큰
+#    - TELEGRAM_CHAT_ID: 알림 받을 채팅 ID
+# =============================================================================
+
+name: 매도 신호 알림
+
+on:
+  # 스케줄 실행 (cron 표현식, UTC 기준)
+  schedule:
+    # 미국 정규장 시간 (한국시간 23:30~06:00 = UTC 14:30~21:00)
+    # 5분 간격으로 실행
+    - cron: '*/5 14-21 * * 1-5'  # 평일 UTC 14:00~21:55
+    
+    # 일일 요약 (한국시간 07:00 = UTC 22:00)
+    - cron: '0 22 * * 1-5'  # 평일 UTC 22:00
+  
+  # 수동 실행 버튼 (테스트용)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '실행 모드'
+        required: true
+        default: 'run_once'
+        type: choice
+        options:
+          - run_once
+          - summary
+          - test
+
+jobs:
+  check-signals:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+      
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: 패키지 설치
+        run: pip install -r requirements.txt
+      
+      - name: 시간대 설정
+        run: |
+          sudo timedatectl set-timezone Asia/Seoul
+          echo "현재 시간: $(date)"
+      
+      - name: 매도 신호 체크 (스케줄 실행)
+        if: github.event_name == 'schedule'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          HOUR=$(date +%H)
+          # UTC 22시 = 한국시간 07시 (일일 요약 시간)
+          if [ "$HOUR" == "07" ]; then
+            echo "📊 일일 요약 전송"
+            python alert_main.py --mode summary
+          else
+            echo "🔍 매도 신호 체크"
+            python alert_main.py --mode run_once
+          fi
+      
+      - name: 수동 실행
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python alert_main.py --mode ${{ github.event.inputs.mode }}
+
