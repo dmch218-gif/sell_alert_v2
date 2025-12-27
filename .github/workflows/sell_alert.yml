@@ -1,0 +1,43 @@
+name: 매도 신호 알림
+
+on:
+  schedule:
+    - cron: '*/5 14-21 * * 1-5'
+    - cron: '0 22 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '실행 모드'
+        required: true
+        default: 'run_once'
+        type: choice
+        options:
+          - run_once
+          - summary
+          - test
+
+jobs:
+  check-signals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: 매도 신호 체크
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            python alert_main.py --mode ${{ github.event.inputs.mode }}
+          else
+            HOUR=$(TZ=Asia/Seoul date +%H)
+            if [ "$HOUR" == "07" ]; then
+              python alert_main.py --mode summary
+            else
+              python alert_main.py --mode run_once
+            fi
+          fi
