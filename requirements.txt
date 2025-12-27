@@ -1,0 +1,9 @@
+pandas>=1.3.0
+numpy>=1.21.0
+tqdm>=4.62.0
+matplotlib>=3.5.0
+
+# 알림 시스템용
+yfinance>=0.2.0
+schedule>=1.2.0
+requests>=2.28.0
