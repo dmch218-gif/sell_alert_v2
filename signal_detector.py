@@ -146,26 +146,25 @@ class SignalDetector:
         position_manager = SellPositionManager(initial_position=100.0)
         max_sell_ratio = self.params.get('max_sell_ratio', 0.01)
         current_position_ratio = 1.0  # 100% 보유 가정
-        
+
         # 전체 기준 매도비율 계산
         if signal_strength > 0:
-            total_sell_ratio = max_sell_ratio * normalized_score * sell_weight * current_position_ratio * price_weight * time_weight
-            total_sell_ratio = min(total_sell_ratio, current_position_ratio)
-            
-            # 최소 매도비율 체크 (5% 미만이면 0)
+            raw_sell_ratio = max_sell_ratio * normalized_score * sell_weight * current_position_ratio * price_weight * time_weight
+            raw_sell_ratio = min(raw_sell_ratio, current_position_ratio)
+
+            # 최소 매도비율 체크 (5% 미만이면 신호 없음)
             min_sell_ratio = current_position_ratio * 0.05
-            if total_sell_ratio < min_sell_ratio:
-                total_sell_ratio = 0.0
+            total_sell_ratio = raw_sell_ratio if raw_sell_ratio >= min_sell_ratio else 0.0
         else:
+            raw_sell_ratio = 0.0
             total_sell_ratio = 0.0
-        
+
         # 보유 기준 매도비율 (현재 100% 보유이므로 전체 기준과 동일)
         hold_based_sell_ratio = total_sell_ratio / current_position_ratio if current_position_ratio > 0 else 0
-        
+
         # 매도비율이 5% 이상일 때만 신호 발생으로 판단
-        # (signal_strength > 0이어도 매도비율이 5% 미만이면 신호 없음으로 처리)
         has_valid_signal = total_sell_ratio > 0
-        
+
         return {
             'date': latest_date,
             'price': latest_price,
@@ -177,7 +176,8 @@ class SignalDetector:
             'sell_weight': sell_weight,  # 매도 가중치
             'price_weight': price_weight,  # 수익률 가중치
             'time_weight': time_weight,  # 시간 가중치
-            'total_sell_ratio': total_sell_ratio,  # 전체 기준 매도비율
+            'raw_sell_ratio': raw_sell_ratio,  # 임계값 적용 전 실제 계산값
+            'total_sell_ratio': total_sell_ratio,  # 5% 임계값 적용 후 매도비율
             'hold_based_sell_ratio': hold_based_sell_ratio,  # 보유 기준 매도비율
             'max_possible_score': max_possible_score,  # 최대 가능 점수 (참고용)
             'has_signal': has_valid_signal  # 매도비율 5% 이상일 때만 True

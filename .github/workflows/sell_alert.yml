@@ -33,11 +33,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             python alert_main.py --mode ${{ github.event.inputs.mode }}
+          elif [ "${{ github.event.schedule }}" == "0 22 * * 1-5" ]; then
+            python alert_main.py --mode summary
           else
-            HOUR=$(TZ=Asia/Seoul date +%H)
-            if [ "$HOUR" == "07" ]; then
-              python alert_main.py --mode summary
-            else
-              python alert_main.py --mode run_once
-            fi
+            python alert_main.py --mode run_once
           fi

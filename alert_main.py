@@ -483,8 +483,12 @@ class RealtimeSellSignalSystem:
                     signal = detector.detect_signal()
                     
                     if signal:
+                        raw = signal.get('raw_sell_ratio', signal['total_sell_ratio'])
                         print(f"  신호 강도: {signal['signal_strength']:.4f}")
-                        print(f"  매도비율: {signal['total_sell_ratio']*100:.2f}%")
+                        if signal['has_signal']:
+                            print(f"  매도비율: {signal['total_sell_ratio']*100:.2f}%")
+                        else:
+                            print(f"  매도비율: {raw*100:.4f}% (계산값, 5% 미만 -> 신호 없음)")
                         print(f"  신호 상태: {'🔴 있음' if signal['has_signal'] else '🟢 없음'}")
                 
             except Exception as e:
@@ -869,30 +873,30 @@ def add_realtime_detection():
         # 매도 비율 계산
         max_sell_ratio = self.params.get('max_sell_ratio', 0.01)
         current_position_ratio = 1.0
-        
+
         if signal_strength > 0 and current_return >= 1.0:  # 수익률 100% 이상
-            total_sell_ratio = max_sell_ratio * normalized_score * sell_weight * current_position_ratio * price_weight * time_weight
-            total_sell_ratio = min(total_sell_ratio, current_position_ratio)
-            
+            raw_sell_ratio = max_sell_ratio * normalized_score * sell_weight * current_position_ratio * price_weight * time_weight
+            raw_sell_ratio = min(raw_sell_ratio, current_position_ratio)
+
             min_sell_ratio = current_position_ratio * 0.05
-            if total_sell_ratio < min_sell_ratio:
-                total_sell_ratio = 0.0
+            total_sell_ratio = raw_sell_ratio if raw_sell_ratio >= min_sell_ratio else 0.0
         else:
+            raw_sell_ratio = 0.0
             total_sell_ratio = 0.0
-        
+
         hold_based_sell_ratio = total_sell_ratio / current_position_ratio if current_position_ratio > 0 else 0
         has_valid_signal = total_sell_ratio > 0
-        
+
         # 실시간 RSI와 BB Position 값도 반환 (디버깅/참고용)
         realtime_rsi = calculate_realtime_rsi(
             self.data, current_price, self.params.get('rsi_period', 14)
         )
         realtime_bb_position = calculate_realtime_bb_position(
-            self.data, current_price, 
+            self.data, current_price,
             self.params.get('bb_period', 20),
             self.params.get('bb_std_dev', 2.0)
         )
-        
+
         return {
             'date': latest_date,
             'price': current_price,
@@ -904,6 +908,7 @@ def add_realtime_detection():
             'sell_weight': sell_weight,
             'price_weight': price_weight,
             'time_weight': time_weight,
+            'raw_sell_ratio': raw_sell_ratio,  # 임계값 적용 전 실제 계산값
             'total_sell_ratio': total_sell_ratio,
             'hold_based_sell_ratio': hold_based_sell_ratio,
             'max_possible_score': max_possible_score,
