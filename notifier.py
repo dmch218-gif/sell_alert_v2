@@ -207,10 +207,30 @@ class TelegramNotifier:
 └ 상태: {signal_status}
 """
             # =====================================================
+            # 📍 가중치 계산 과정 테이블
+            # =====================================================
+            signal_str = summary.get('signal_strength', 0)
+            max_score = summary.get('max_possible_score', 0)
+            norm = summary.get('normalized_score', 0)
+            sw = summary.get('sell_weight', 0)
+            pw = summary.get('price_weight', 0)
+            tw = summary.get('time_weight', 0)
+            raw_ratio = summary.get('raw_sell_ratio', 0)
+
+            message += f"""
+<b>📊 가중치 계산 과정</b>
+<code>신호강도   : {signal_str:.2f} / {max_score:.0f}  (정규화 {norm:.4f})</code>
+<code>신호가중치 : {sw:.4f}</code>
+<code>수익률가중치: {pw:.4f}</code>
+<code>시간가중치 : {tw:.4f}</code>
+"""
+
+            # =====================================================
             # 📍 종가 기준 매도비율 (메인)
             # =====================================================
             if summary.get('has_signal') and closing_sell_ratio > 0:
-                message += f"""
+                message += f"""<code>→ 매도비율 : {raw_ratio*100:.4f}%  ✅ 신호 발생</code>
+
 🎯 <b>종가 기준 매도비율: {closing_sell_ratio*100:.2f}%</b>
    (전날 보유비중 기준, 종가로 계산)
 
@@ -218,7 +238,10 @@ class TelegramNotifier:
    → 전날 보유비중의 <b>{closing_sell_ratio*100:.2f}%</b>를 매도하세요.
 """
             else:
-                message += "\n📋 종가 기준 매도 신호 없음\n"
+                message += f"""<code>→ 매도비율 : {raw_ratio*100:.4f}%  ❌ 5% 미만</code>
+
+📋 종가 기준 매도 신호 없음
+"""
             
             # =====================================================
             # 📍 장중 실시간 신호 이력 (참고용)

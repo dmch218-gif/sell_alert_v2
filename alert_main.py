@@ -429,11 +429,17 @@ class RealtimeSellSignalSystem:
                     'days_held': signal['days_held'],
                     'days_from_low': signal['days_from_low'],
                     'signal_strength': signal['signal_strength'],
+                    'max_possible_score': signal.get('max_possible_score', 0),
                     'signal_indicators': signal.get('signal_indicators', []),
+                    'normalized_score': signal.get('normalized_score', 0),
+                    'sell_weight': signal.get('sell_weight', 0),
+                    'price_weight': signal.get('price_weight', 0),
+                    'time_weight': signal.get('time_weight', 0),
+                    'raw_sell_ratio': signal.get('raw_sell_ratio', signal['total_sell_ratio']),
                     'total_sell_ratio': signal['total_sell_ratio'],
                     'has_signal': signal['has_signal'],
                     'change_percent': change_percent,
-                    'sell_count': sell_count  # 과거 신호 횟수 추가
+                    'sell_count': sell_count
                 })
                 
                 status = "🔴 신호 있음" if signal['has_signal'] else "🟢 신호 없음"
