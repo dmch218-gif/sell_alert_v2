@@ -187,7 +187,9 @@ class RealtimeSellSignalSystem:
         cumulative_ratio = 0.0
         current_position = 1.0  # 100%
 
-        for i in range(len(data)):
+        # 마지막 행(오늘)은 제외: detector.detect_signal()이 오늘을 별도 처리하므로
+        # 포함하면 오늘이 신호 발생일일 때 sell_count가 1 과잉 계산됨
+        for i in range(len(data) - 1):
             row = data.iloc[i]
             date = row['Date']
             price = row['Close']
