@@ -181,74 +181,80 @@ class RealtimeSellSignalSystem:
         time_weight_slope = params.get('time_weight_slope', 0.025)
         
         sell_history = []
-        sell_count = 0
+        signal_count = 0      # 신호 발생일 수 (5% 임계값 무관) - 백테스트 엔진 동기화
+        actual_sell_count = 0  # 실제 매도 실행 횟수 (이력 표시용)
+        warmup = 5             # 백테스트 엔진과 동일 워밍업
         cumulative_ratio = 0.0
         current_position = 1.0  # 100%
-        
+
         for i in range(len(data)):
             row = data.iloc[i]
             date = row['Date']
             price = row['Close']
-            
+
             # 매수일 이전은 스킵
             if date < buy_date:
                 continue
-            
+
             signal_strength = combined.iloc[i]
             if signal_strength <= 0:
                 continue
-            
+
             # 수익률 계산
             current_return = (price - buy_price) / buy_price
-            
+
             # 수익률 100% 미만이면 스킵
             if current_return < 1.0:
                 continue
-            
+
+            # 신호 발생 카운트 (5% 임계값과 무관하게 증가 - 백테스트 엔진 동기화)
+            signal_count += 1
+            effective_sell_count = max(0, signal_count - warmup)  # 워밍업 제외
+
             # 보유일수 계산
             days_held = (date - buy_date).days
-            
+
             # 정규화값
             normalized_score = min(signal_strength / max_possible_score, 1.0) if max_possible_score > 0 else 0
-            
-            # 신호가중치 계산: coefficient × base^(sell_count - 1)
-            if sell_count == 0:
+
+            # 신호가중치: effective_sell_count 기준 (워밍업 제외 카운트)
+            if effective_sell_count == 0:
                 sell_weight = sell_weight_coefficient
             else:
-                sell_weight = sell_weight_coefficient * (sell_weight_base ** (sell_count - 1))
-            
+                sell_weight = sell_weight_coefficient * (sell_weight_base ** (effective_sell_count - 1))
+
             # 수익률 가중치
             price_weight = max(1.0, (1.0 + current_return) ** price_weight_exponent)
-            
+
             # 시간 가중치
             sigmoid = 1 / (1 + math.exp(-time_weight_slope * (days_held - time_weight_midpoint)))
             time_weight = 1 + (time_weight_max - 1) * sigmoid
-            
+
             # 매도비율 계산
             sell_ratio = max_sell_ratio * normalized_score * sell_weight * current_position * price_weight * time_weight
             sell_ratio = min(sell_ratio, current_position)
-            
-            # 최소 매도비율 체크 (5% 미만이면 0)
+
+            # 최소 매도비율 체크 (5% 미만이면 실행 안 함 - 카운트는 이미 완료)
             min_sell_ratio = current_position * 0.05
             if sell_ratio < min_sell_ratio:
                 continue
-            
-            # 유효 신호 발생!
-            sell_count += 1
+
+            # 실제 매도 실행
+            actual_sell_count += 1
             cumulative_ratio += sell_ratio
             current_position = max(0, 1.0 - cumulative_ratio)
-            
+
             sell_history.append({
-                'no': sell_count,
+                'no': actual_sell_count,
                 'date': date.strftime('%Y-%m-%d'),
                 'price': price,
                 'sell_ratio': sell_ratio,
                 'cumulative_ratio': cumulative_ratio,
                 'remaining_ratio': current_position
             })
-        
+
         return {
-            'sell_count': sell_count,
+            'sell_count': max(0, signal_count - warmup),  # 백테스트 엔진과 동일 (워밍업 제외)
             'sell_history': sell_history
         }
     
