@@ -39,35 +39,40 @@ class SignalDetector:
         # 신호 생성기 초기화
         self.signal_generator = SellSignalGenerator(data)
         
-    def detect_signal(self) -> dict:
+    def detect_signal(self, price_for_weight: float = None) -> dict:
         """
         최신 데이터에서 매도 신호 감지
-        
+
+        Args:
+            price_for_weight: 수익률 가중치 계산에 사용할 가격.
+                              None이면 시뮬레이션 행의 실제 종가 사용.
+                              시뮬레이션에서 가격 가중치만 별도 지정할 때 사용.
         Returns:
             신호 정보 딕셔너리
         """
         if self.data is None or self.data.empty:
             return None
-        
+
         # 최신 데이터
         latest = self.data.iloc[-1]
         latest_date = latest['Date']
-        latest_price = latest['Close']
-        
+        latest_price = latest['Close']  # 신호 감지용 실제 종가
+
         # 저점 대비 보유일수 계산 (최근 저점부터 현재까지)
         low_idx = self.data['Low'].idxmin()  # 최저점 인덱스
         low_date = self.data.loc[low_idx, 'Date']
         days_from_low = (latest_date - low_date).days
         if days_from_low < 0:
             days_from_low = 0
-        
+
         # 매수일 기준 보유 일수 (시간 가중치 계산용)
         days_held = (latest_date - self.buy_date).days
         if days_held < 0:
             days_held = 0
-        
-        # 수익률 계산 (내부 계산용)
-        current_return = (latest_price - self.buy_price) / self.buy_price
+
+        # 수익률 계산: price_for_weight가 있으면 그 가격 기준, 없으면 실제 종가 기준
+        effective_price = price_for_weight if price_for_weight is not None else latest_price
+        current_return = (effective_price - self.buy_price) / self.buy_price
         
         # 개별 지표별 신호 계산
         rsi_signal = self.signal_generator.generate_rsi_signal(
@@ -167,20 +172,21 @@ class SignalDetector:
 
         return {
             'date': latest_date,
-            'price': latest_price,
-            'days_from_low': days_from_low,  # 저점 대비 보유일수
-            'days_held': days_held,  # 매수일 기준 보유일수
+            'price': latest_price,               # 신호 감지용 실제 종가
+            'price_for_weight': effective_price, # 수익률 가중치 계산용 가격
+            'days_from_low': days_from_low,
+            'days_held': days_held,
             'signal_strength': signal_strength,
             'signal_indicators': signal_indicators,
-            'normalized_score': normalized_score,  # 정규화값
-            'sell_weight': sell_weight,  # 매도 가중치
-            'price_weight': price_weight,  # 수익률 가중치
-            'time_weight': time_weight,  # 시간 가중치
-            'raw_sell_ratio': raw_sell_ratio,  # 임계값 적용 전 실제 계산값
-            'total_sell_ratio': total_sell_ratio,  # 5% 임계값 적용 후 매도비율
-            'hold_based_sell_ratio': hold_based_sell_ratio,  # 보유 기준 매도비율
-            'max_possible_score': max_possible_score,  # 최대 가능 점수 (참고용)
-            'has_signal': has_valid_signal  # 매도비율 5% 이상일 때만 True
+            'normalized_score': normalized_score,
+            'sell_weight': sell_weight,
+            'price_weight': price_weight,
+            'time_weight': time_weight,
+            'raw_sell_ratio': raw_sell_ratio,        # 임계값 적용 전 실제 계산값
+            'total_sell_ratio': total_sell_ratio,    # 5% 임계값 적용 후 매도비율
+            'hold_based_sell_ratio': hold_based_sell_ratio,
+            'max_possible_score': max_possible_score,
+            'has_signal': has_valid_signal
         }
 
 
